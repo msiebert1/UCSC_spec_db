@@ -1,6 +1,8 @@
 import copy
 import sqlite3 as sq3
 import matplotlib.pyplot as plt
+import glob
+import numpy as np
 
 class spectrum(object):
     """A generic class to represent a spectrum and its associated metadata
@@ -49,7 +51,7 @@ def grab_all_spec_data(sql_input, db_file = None):
     return spec_list
 
 def query_and_plot(sql_input):
-    spec_list = grab_all_spec_data(query)
+    spec_list = grab_all_spec_data(sql_input)
     plt.figure(figsize=[15,7])
     buff=0.3
     for i, nspec in enumerate(np.asarray(spec_list)):

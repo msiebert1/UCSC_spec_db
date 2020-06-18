@@ -15,7 +15,7 @@ class spectrum(object):
 def grab_all_spec_data(sql_input, db_file = None):
 
     if db_file is None:
-        db_file = glob.glob('*.db')[0]
+        db_file = glob.glob('../*.db')[0]
 
     con = sq3.connect(db_file)
     print ("Collecting data from", db_file, "...")

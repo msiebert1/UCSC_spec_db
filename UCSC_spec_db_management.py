@@ -41,14 +41,17 @@ def process_keck_file(spec):
     meta_dict['MAXWAVE'] = np.round(float(head['W_RANGE'].split()[1]),4)
     meta_dict['WAVEDELT'] = np.round(wavedelt,4)
     meta_dict['CRVAL'] = np.round(wavezero,4)
+    meta_dict['DATE_OBS'] = head['DATE-OBS'].strip().split('T')[0]
     meta_dict['MJD'] = float(head['MJD-OBS'])
     meta_dict['UTC']  = head['UTC']
     meta_dict['POS_ANG'] = np.round(float(head['ROTPOSN'])+90, 2)
     meta_dict['FLUX_OBJ'] = head['FLUX_OBJ']
     
     radec = SkyCoord(head['RA'], head['DEC'], frame='icrs', unit=(u.hourangle, u.deg))
-    meta_dict['RA_OBS'] = np.round(radec.ra.deg, 4)
-    meta_dict['DEC_OBS'] = np.round(radec.dec.deg, 4)
+    # meta_dict['RA_OBS'] = np.round(radec.ra.deg, 4)
+    # meta_dict['DEC_OBS'] = np.round(radec.dec.deg, 4)
+    meta_dict['RA'] = np.round(radec.ra.deg, 4)
+    meta_dict['DEC'] = np.round(radec.dec.deg, 4)
 #     apo = Observer.at_site("Keck")
 #     date = head['DATE_BEG']
 #     par_ang = apo.parallactic_angle(date.split('T')[0] + ' ' + date.split('T')[1], radec)
@@ -56,6 +59,7 @@ def process_keck_file(spec):
     
     meta_dict['OBSERVER'] = head['OBSERVER'].strip()
     meta_dict['REDUCER'] = head['REDUCER']
+    meta_dict['RED_DATE'] = head['RED_DATE'].strip()
     
     meta_dict['INSTRUMENT'] = head['INSTRUME'].strip()
     meta_dict['GRATING'] = head['GRANAME'].strip()
@@ -128,6 +132,7 @@ def process_lick_file(spec):
     meta_dict['MAXWAVE'] = np.round(float(head['W_RANGE'].split()[1]),4)
     meta_dict['WAVEDELT'] = np.round(wavedelt,4)
     meta_dict['CRVAL'] = np.round(wavezero,4)
+    meta_dict['DATE_OBS'] = head['DATE-OBS'].strip().split('T')[0]
     ut_date = head['DATE-OBS'].strip()
     t = Time(ut_date, format='isot')
     meta_dict['MJD'] = float(t.mjd)
@@ -145,6 +150,7 @@ def process_lick_file(spec):
     
     meta_dict['OBSERVER'] = head['OBSERVER'].strip()
     meta_dict['REDUCER'] = head['REDUCER']
+    meta_dict['RED_DATE'] = head['RED_DATE'].strip()
     
     meta_dict['INSTRUMENT'] = head['VERSION'].strip()
     meta_dict['GRATING'] = head['GRATNG_N'].strip()
@@ -228,6 +234,7 @@ def setup_db(spec, new_db_name, telescope):
 
 def add_spectrum_to_db(new_db_name, spec, telescope):
     con = sq3.connect(new_db_name)
+
     if telescope == 'keck':
         wave, flux, err, meta_dict = process_keck_file(spec)
     elif telescope == 'lick':
@@ -257,7 +264,9 @@ def add_spectrum_to_db(new_db_name, spec, telescope):
     con.commit()
 
 
-def add_final_reductions():
+def add_final_reductions(local):
+    # if local this should be run in the pre_reduced directory
+
     path = os.getcwd()
     if 'keck' in path.lower():
         telescope = 'keck'
@@ -267,17 +276,18 @@ def add_final_reductions():
         print ('Telescope not implemented')
         return
 
-    db_path_ziggy = '/data2/UCSC_Spectral_Database/'
+    if not local:
+        db_path = '/data2/UCSC_Spectral_Database/'
+    else:
+        db_path = '/Users/msiebert/Documents/UCSC/Research/UCSC_spec_database/'
+
     spec_files = glob.glob(path+"/final_reductions/*.fits")
-    print (db_path_ziggy+'UCSC_SPEC_DATA_DEV.db')
+    print ('Adding spectra to: ', db_path+'UCSC_SPEC_DATA_DEV.db')
+
     for spec in spec_files:
-        add_spectrum_to_db(db_path_ziggy+'UCSC_SPEC_DATA_DEV.db', spec, telescope)
-        print (spec, 'added to database')
+        add_spectrum_to_db(db_path+'UCSC_SPEC_DATA_DEV.db', spec, telescope)
     return
 
-
-if __name__ == "__main__":
-    main()
 
 
 

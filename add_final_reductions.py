@@ -15,4 +15,6 @@ if __name__ == "__main__":
     _local= option.local
     _wipedate= option.wipedate
     
+    if _wipedate:
+        spec_db.delete_date(_local, args[0])
     spec_db.add_final_reductions(_local)

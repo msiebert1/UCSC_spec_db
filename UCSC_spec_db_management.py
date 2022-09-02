@@ -264,6 +264,16 @@ def add_spectrum_to_db(new_db_name, spec, telescope):
     con.commit()
 
 
+def delete_date(local, date):
+    if not local:
+        db_path = '/data2/UCSC_Spectral_Database/'
+    else:
+        db_path = '/Users/msiebert/Documents/UCSC/Research/UCSC_spec_database/'
+    con = sq3.connect(db_path+'UCSC_SPEC_DATA_DEV.db')
+    cur = con.cursor()
+    cur.execute("DELETE FROM Spectra where FILENAME like '%{date}%'".format(date=date))
+    con.commit()
+
 def add_final_reductions(local):
     # if local this should be run in the pre_reduced directory
 

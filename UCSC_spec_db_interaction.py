@@ -85,7 +85,7 @@ def grab_all_spec_data(sql_input, _local):
     print (len(spec_list), 'Total Spectra found')
     return spec_list
 
-def query_and_plot(sql_input):
+def query_and_plot(sql_input,_local=True, xlim=None, ylim=None):
     spec_list = grab_all_spec_data(sql_input,_local)
     plt.figure(figsize=[15,8])
     buff=0.3
@@ -93,6 +93,10 @@ def query_and_plot(sql_input):
         plt.plot(nspec.wavelength, nspec.flux - i*buff, drawstyle='steps-mid', label=nspec.meta_dict['FILENAME'])
         plt.fill_between(nspec.wavelength, nspec.flux - i*buff - nspec.err, nspec.flux - i*buff + nspec.err, color = 'gray')
         plt.legend(fontsize=15, loc=1)
+        if xlim:
+            plt.xlim(xlim[0],xlim[1])
+        if ylim:
+            plt.ylim(ylim[0],ylim[1])
     plt.show() 
 
     return spec_list
@@ -135,7 +139,7 @@ def plot_sn(sn_name, _local, all_files=False):
 
     return spec_list
 
-def host_line_plots(spectra, z, region = [6500, 6800], plot_region = None, legend = False, rescale=False, cont_subtract=True):
+def host_line_plots(spectra, z, region = [6500, 6800], plot_region = None, legend = False, rescale=False, cont_subtract=True, ylim=None):
     w1 = region[0]
     w2 = region[1]
     plt.figure(figsize=[15,8])
@@ -214,18 +218,22 @@ def host_line_plots(spectra, z, region = [6500, 6800], plot_region = None, legen
         plt.xlim([plot_region[0],plot_region[1]])
     else:
         plt.xlim([region[0],region[1]])
+    if ylim:
+        plt.ylim([ylim[0],ylim[1]])
     
     plt.show()
 
-def host_line_plots_fancy(spectra, z, neb = None, region = [6500, 6800], plot_region = None, legend = False, rescale=False, cont_subtract=True):
+def host_line_plots_fancy(spectra, z, neb = None, region = [6500, 6800], plot_region = None, legend = False, size = [15,8],
+                          rescale=False, cont_subtract=True,save=False, suf = ''):
     w1 = region[0]
     w2 = region[1]
     # plt.figure(figsize=[15,8])
-    basic_format(size=[15,8])
+    basic_format(size=size)
 
         # plt.plot(neb.wavelength[new_roi], flux_filt, drawstyle='steps-mid', color='r')
 
-    labels = ['Galaxy','Firefly Continuum Fit']
+    labels = ['SN 2017gfl Host Galaxy (LRIS)','Firefly Continuum Fit']
+    colors = ['#0077BB','#EE3377']
     for i, spec in enumerate(spectra):
         wavelength = spec.wavelength/(1.+z)
         roi = (wavelength > w1) & (wavelength < w2)
@@ -248,7 +256,7 @@ def host_line_plots_fancy(spectra, z, neb = None, region = [6500, 6800], plot_re
 
         if plot_region:
             new_roi = (wavelength > plot_region[0]) & (wavelength < plot_region[1])
-            plt.plot(wavelength[new_roi], flux_norm[new_roi], drawstyle='steps-mid', label=labels[i])
+            plt.plot(wavelength[new_roi]+.3, flux_norm[new_roi]+.3, drawstyle='steps-mid', label=labels[i], color=colors[i])
         else:
             plt.plot(wavelength[roi], flux_norm[roi], drawstyle='steps-mid', label=spec.meta_dict['FILENAME'])
         # plt.plot(wavelength, flux_norm, drawstyle='steps-mid', label=spec.meta_dict['FILENAME'])
@@ -258,7 +266,7 @@ def host_line_plots_fancy(spectra, z, neb = None, region = [6500, 6800], plot_re
     if neb:
         new_roi = (neb.wavelength > plot_region[0]) & (neb.wavelength < plot_region[1])
         flux_filt = scipy.signal.medfilt(neb.flux, kernel_size=201)[new_roi]
-        plt.plot(neb.wavelength[new_roi], neb.flux[new_roi]-flux_filt, drawstyle='steps-mid', color='g', label='Nebular Emission')
+        plt.plot(neb.wavelength[new_roi], neb.flux[new_roi]-flux_filt, drawstyle='steps-mid', color='k', label='Gas-only')
 
     line_dict = {'H':       ([6562.79, 4861.35, 4340.472, 4101.734], 'mediumblue'),
                  '[O III]': ([4958.911, 5006.843, 4363.210], 'magenta'),
@@ -308,9 +316,11 @@ def host_line_plots_fancy(spectra, z, neb = None, region = [6500, 6800], plot_re
     
     plt.ylabel(r'$F_{\lambda}$ ($10^{-15}$ ergs cm$^{-2}$ s$^{-1}$ $\AA^{-1}$)', fontsize = 25)
     plt.xlabel(r'Rest Wavelength ($\mathrm{\AA}$)', fontsize = 25)
-    plt.legend(loc=2, fontsize=20, frameon=False)
-    # plt.savefig('/Users/msiebert/Documents/UCSC/Research/Foundation_Hosts/plots/gal_fit.png', dpi = 300, bbox_inches = 'tight')
-    # plt.savefig('/Users/msiebert/Documents/UCSC/Research/Foundation_Hosts/plots/gal_fit.pdf', dpi = 300, bbox_inches = 'tight')
+    if legend:
+        plt.legend(loc=1, fontsize=20, frameon=False)
+    if save:
+        plt.savefig('/Users/msiebert/Documents/UCSC/Research/Foundation_Hosts/plots/gal_fit_2017gfl'+suf+'.png', dpi = 300, bbox_inches = 'tight')
+        plt.savefig('/Users/msiebert/Documents/UCSC/Research/Foundation_Hosts/plots/gal_fit_2017gfl'+suf+'.pdf', dpi = 300, bbox_inches = 'tight')
     plt.show()
 
 if __name__ == "__main__":

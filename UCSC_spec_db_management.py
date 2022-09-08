@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import os
 import numpy as np 
@@ -9,6 +10,8 @@ from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 import copy
+import UCSC_spec_db_interaction as spec_db_interact
+from optparse import OptionParser
 
 
 ###################
@@ -23,6 +26,7 @@ def process_keck_file(spec):
     
     filename = spec.split('/')[-1]
     head=spec_fits[0].header
+    meta_dict['FULL_PATH']  = spec
     meta_dict['FILENAME']  = filename
     meta_dict['OBJECT']  = head['OBJECT']
     
@@ -35,14 +39,27 @@ def process_keck_file(spec):
     wave=np.arange(len(flux))*wavedelt+wavezero
     airmass=float(head['AIRMASS'])
     
-    meta_dict['EXPTIME']  = float(head['EXPTIME'])
+    if head.get('EXPTIME', None) is None:
+        if head.get('TTIME', None) is None:
+            meta_dict['EXPTIME']  = float(head['ELAPTIME'])
+        else:
+            meta_dict['EXPTIME']  = float(head['TTIME'])
+    else:
+        meta_dict['EXPTIME']  = float(head['EXPTIME'])
+
     meta_dict['AIRMASS'] = np.round(float(head['AIRMASS']),3)
     meta_dict['MINWAVE'] = np.round(float(head['W_RANGE'].split()[0]),4)
     meta_dict['MAXWAVE'] = np.round(float(head['W_RANGE'].split()[1]),4)
     meta_dict['WAVEDELT'] = np.round(wavedelt,4)
     meta_dict['CRVAL'] = np.round(wavezero,4)
     meta_dict['DATE_OBS'] = head['DATE-OBS'].strip().split('T')[0]
-    meta_dict['MJD'] = float(head['MJD-OBS'])
+
+    if head.get('MJD-OBS', None) is None:
+        ut_date = head['DATE-OBS'].strip()
+        t = Time(ut_date, format='isot')
+        meta_dict['MJD'] = float(t.mjd)
+    else:
+        meta_dict['MJD'] = float(head['MJD-OBS'])
     meta_dict['UTC']  = head['UTC']
     meta_dict['POS_ANG'] = np.round(float(head['ROTPOSN'])+90, 2)
     meta_dict['FLUX_OBJ'] = head['FLUX_OBJ']
@@ -100,9 +117,9 @@ def process_keck_file(spec):
         meta_dict['AP_LOC'] = 'NUC'
         meta_dict['IS_KRON_RAD'] = 1
     else:
-        meta_dict['AP_SIZE'] = None
-        meta_dict['AP_UNIT'] = None
-        meta_dict['AP_LOC'] = None
+        meta_dict['AP_SIZE'] = -99
+        meta_dict['AP_UNIT'] = 'None'
+        meta_dict['AP_LOC'] = 'None'
         meta_dict['IS_KRON_RAD'] = 0
         
     return wave, flux, err, meta_dict
@@ -114,6 +131,7 @@ def process_lick_file(spec):
     
     filename = spec.split('/')[-1]
     head=spec_fits[0].header
+    meta_dict['FULL_PATH']  = spec
     meta_dict['FILENAME']  = filename
     meta_dict['OBJECT']  = head['OBJECT']
     
@@ -126,7 +144,13 @@ def process_lick_file(spec):
     wave=np.arange(len(flux))*wavedelt+wavezero
     airmass=float(head['AIRMASS'])
     
-    meta_dict['EXPTIME']  = float(head['EXPTIME'])
+    if head.get('EXPTIME', None) is None:
+        if head.get('TTIME', None) is None:
+            meta_dict['EXPTIME']  = float(head['ELAPTIME'])
+        else:
+            meta_dict['EXPTIME']  = float(head['TTIME'])
+    else:
+        meta_dict['EXPTIME']  = float(head['EXPTIME'])
     meta_dict['AIRMASS'] = np.round(float(head['AIRMASS']),3)
     meta_dict['MINWAVE'] = np.round(float(head['W_RANGE'].split()[0]),4)
     meta_dict['MAXWAVE'] = np.round(float(head['W_RANGE'].split()[1]),4)
@@ -191,7 +215,7 @@ def process_lick_file(spec):
         meta_dict['AP_LOC'] = 'NUC'
         meta_dict['IS_KRON_RAD'] = 1
     else:
-        meta_dict['AP_SIZE'] = np.nan
+        meta_dict['AP_SIZE'] = -99
         meta_dict['AP_UNIT'] = 'None'
         meta_dict['AP_LOC'] = 'None'
         meta_dict['IS_KRON_RAD'] = 0
@@ -223,7 +247,6 @@ def setup_db(spec, new_db_name, telescope):
     type_dict = {'str': 'TEXT', 'float64': 'REAL', 'float': 'REAL', 'int': 'BIT'}
     for m in meta_dict:
         if m != 'FILENAME' and type(meta_dict[m]) != None:
-            print (m)
             db_setup_str = db_setup_str + m + ' ' + type_dict[type(meta_dict[m]).__name__] + ', '
     db_setup_str = db_setup_str + 'RAW_FLUX BLOB, '
     db_setup_str = db_setup_str + 'RAW_ERR BLOB'
@@ -251,7 +274,7 @@ def add_spectrum_to_db(new_db_name, spec, telescope):
     for m in meta_dict:
         add_str = add_str + m + ', '
         meta_data = meta_data + (meta_dict[m],)
-        
+
     add_str = add_str + 'RAW_FLUX, '
     meta_data = meta_data + (flux_binary,)
     add_str = add_str + 'RAW_ERR)'
@@ -297,6 +320,71 @@ def add_final_reductions(local):
     for spec in spec_files:
         add_spectrum_to_db(db_path+'UCSC_SPEC_DATA_DEV.db', spec, telescope)
     return
+
+def update_spec_database(overwrite=False):
+    db_path = '/data2/UCSC_Spectral_Database/'
+    kast_path = '/data2/Lick/Kast/'
+    lris_path = '/data2/Keck/Keck/LRIS'
+
+    final_reductions = []
+    for root, dirs, files in os.walk(lris_path, topdown=False):
+        for name in files:
+            if 'final_reductions' in os.path.join(root, name):
+                # print(os.path.join(root, name))
+                final_reductions.append(os.path.join(root, name))
+    for root, dirs, files in os.walk(kast_path, topdown=False):
+        for name in files:
+            if 'final_reductions' in os.path.join(root, name):
+                # print(os.path.join(root, name))
+                final_reductions.append(os.path.join(root, name))
+    print ('Found', len(final_reductions), 'final reductions')
+
+    db_specs = spec_db_interact.grab_all_spec_data("SELECT * from SPECTRA", False)
+    db_files = []
+    for spec in db_specs:
+        # print(spec.meta_dict['FILENAME'])
+        db_files.append(spec.meta_dict['FILENAME'])
+    if overwrite == True:
+        db_files = []
+        
+    count_new_spec = 0
+    for f in final_reductions:
+        in_db = False
+        for db_f in db_files:
+            if db_f in f:
+                in_db = True
+                break
+        if not in_db:
+            if 'Kast' in f:
+                add_spectrum_to_db(db_path+'UCSC_SPEC_DATA_DEV.db', f, 'lick')
+                count_new_spec = count_new_spec + 1
+            elif 'LRIS' in f:
+                add_spectrum_to_db(db_path+'UCSC_SPEC_DATA_DEV.db', f, 'keck')
+                count_new_spec = count_new_spec + 1
+    print ('Added', count_new_spec, 'files to database')
+
+
+if __name__ == "__main__":
+
+    description = "For data model database structure changes "
+    usage = "%prog    \t [option] \n Recommended syntax: %prog"
+    parser = OptionParser(usage=usage, description=description, version="0.1" )
+    parser.add_option("-s", "--setup", dest="setup", action="store_true",
+                      help='Run database setup again (will rewrite database)')
+
+    option, args = parser.parse_args()
+    _setup= option.setup
+
+    db_path = '/data2/UCSC_Spectral_Database/'
+    if _setup:
+        #example file, will use header to set database schema
+        example_file = '/data2/Keck/Keck/LRIS/20171117/pre_reduced/final_reductions/SN2017coa-blue-20171117_ap1.fits'
+        setup_db(example_file, db_path+'UCSC_SPEC_DATA_DEV.db', 'keck')
+
+
+
+
+
 
 
 

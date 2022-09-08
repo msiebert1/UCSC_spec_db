@@ -2,7 +2,7 @@
 import copy
 import sqlite3 as sq3
 import matplotlib
-# matplotlib.use('GTKAgg')
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import glob
 import numpy as np
@@ -80,9 +80,9 @@ def grab_all_spec_data(sql_input, _local):
         spec =  spectrum(wavelength=wave, flux=flux, err=err, meta_dict=spec_metadata)
         spec_list.append(copy.deepcopy(spec))
         
-    for spec in spec_list:
-        print(spec.meta_dict['FILENAME'])
-    print (len(spec_list), 'Total Spectra found')
+    # for spec in spec_list:
+    #     print(spec.meta_dict['FILENAME'])
+    print (len(spec_list), 'Total Spectra found in db')
     return spec_list
 
 def query_and_plot(sql_input,_local=True, xlim=None, ylim=None):
@@ -120,7 +120,7 @@ def check_date(date, _local, all_files=False):
 
     return spec_list
 
-def plot_sn(sn_name, _local, all_files=False):
+def get_sn(sn_name, _local, all_files=False, plot=False):
 
     if all_files:
         sql_input = "SELECT * from SPECTRA where OBJECT like '%{sn_name}%'".format(sn_name=sn_name)
@@ -128,14 +128,24 @@ def plot_sn(sn_name, _local, all_files=False):
         sql_input = "SELECT * from SPECTRA where OBJECT like '%{sn_name}%' and FILENAME like '%combined%'".format(sn_name=sn_name)
 
     spec_list = grab_all_spec_data(sql_input,_local)
-    plt.figure(figsize=[15,8])
-    buff=0.3
+    if plot:
+        plt.figure(figsize=[8,4])
+    buff=0.
+    mjds = []
+    spec_list = np.asarray(spec_list)
     for i, nspec in enumerate(np.asarray(spec_list)):
+        mjds.append(nspec.meta_dict['MJD'])
+
+    spec_list_sort = spec_list[np.argsort(mjds)]
+    for i, nspec in enumerate(np.asarray(spec_list_sort)):
         print (nspec.meta_dict['DATE_OBS'])
-        plt.plot(nspec.wavelength, nspec.flux - i*buff, drawstyle='steps-mid', label=nspec.meta_dict['FILENAME'])
-        plt.fill_between(nspec.wavelength, nspec.flux - i*buff - nspec.err, nspec.flux - i*buff + nspec.err, color = 'gray')
-        plt.legend(fontsize=15, loc=1)
-    plt.show() 
+        print (nspec.meta_dict['FULL_PATH'])
+        if plot:
+            plt.plot(nspec.wavelength, nspec.flux - i*buff, drawstyle='steps-mid', label=nspec.meta_dict['FILENAME'])
+            # plt.fill_between(nspec.wavelength, nspec.flux - i*buff - nspec.err, nspec.flux - i*buff + nspec.err, color = 'gray')
+            plt.legend(fontsize=15, loc=1)
+    if plot:
+        plt.show() 
 
     return spec_list
 
@@ -331,19 +341,25 @@ if __name__ == "__main__":
     parser.add_option("-l", "--local", dest="local", action="store_true",
                       help='Add data to local (msiebert) database')
     parser.add_option("--sn", dest="sn", action="store_true",
-                      help='Plot the spectra of a single target')
+                      help='Get the spectra of a single target')
+    parser.add_option("--plot", dest="plot", action="store_true",
+                      help='Plot the spectra of a single target (use with --sn)')
     parser.add_option("--date", dest="date", action="store_true",
                       help='List the spectra from a single date')
 
     option, args = parser.parse_args()
     _local= option.local
     _sn= option.sn
+    _plot= option.plot
     _date= option.date
 
 
     if _sn:
         sn_name = args[0]
-        spec_list = plot_sn(sn_name, _local)
+        if _plot:
+            spec_list = get_sn(sn_name, _local, plot = True)
+        else:
+            spec_list = get_sn(sn_name, _local)
     if _date:
         date = args[0]
         spec_list = check_date(date, _local)

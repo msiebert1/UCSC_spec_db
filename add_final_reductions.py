@@ -10,11 +10,23 @@ if __name__ == "__main__":
                       help='Add data to local (msiebert) database')
     parser.add_option("--wipe-date", dest="wipedate", action="store_true",
                       help='Delete reductions from specified date')
+    parser.add_option("--update-all", dest="updateall", action="store_true",
+                      help='Update database with all final reductions on ziggy')
+    parser.add_option("--overwrite", dest="overwrite", action="store_true",
+                      help='Overwrite existing spectra in database (meant to be a complete database refresh)')
 
     option, args = parser.parse_args()
     _local= option.local
     _wipedate= option.wipedate
-    
-    if _wipedate:
-        spec_db.delete_date(_local, args[0])
-    spec_db.add_final_reductions(_local)
+    _updateall= option.updateall
+    _overwrite= option.overwrite
+
+    if _updateall:
+        if _overwrite:
+            spec_db.update_spec_database(overwrite = True)
+        else:
+            spec_db.update_spec_database()
+    else:
+        if _wipedate:
+            spec_db.delete_date(_local, args[0])
+        spec_db.add_final_reductions(_local)
